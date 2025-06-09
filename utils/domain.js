@@ -1,37 +1,10 @@
-const tls = require('tls');
 const dns = require('dns').promises;
-
-const TLS_VERSIONS = ['TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3'];
-
-const connectTLS = async (params) => {
-  return new Promise((resolve, reject) => {
-    const socket = tls.connect(params, () => {
-      resolve(socket);
-    });
-
-    socket.on('error', (err) => {
-      socket.destroy();
-      reject(err);
-    });
-  });
-}
-
-const findMinTLSVersion = async (params) => {
-  for (const version of TLS_VERSIONS) {
-    try {
-      const socket = await connectTLS({
-        ...params,
-        minVersion: version,
-        maxVersion: version,
-      });
-
-      socket.destroy();
-      return version;
-    } catch (err) {
-      console.warn(`TLS version ${version} not supported for ${params.servername}`);
-    }
-  }
-}
+const { connectTLS, findMinTLSVersion } = require('./tls');
+const { 
+  getPEMCertificate,
+  getSignatureAlgorithm, 
+  getSignatureHashAlgorithm 
+} = require('./certificates');
 
 const probeDomain = async (domain) => {
   const result = {
@@ -63,10 +36,15 @@ const probeDomain = async (domain) => {
   if (peerCert) {
     let cert = peerCert;
     while (cert) {
+      const pem = getPEMCertificate(cert.raw);
+
       result.certificateChain.push({
         subject: cert.subject,
         issuer: cert.issuer,
+        signatureAlgorithm: getSignatureAlgorithm(pem),
+        signatureHashAlgorithm: getSignatureHashAlgorithm(pem),
       });
+
       cert = cert.issuerCertificate && cert.issuerCertificate !== cert
         ? cert.issuerCertificate
         : null;
