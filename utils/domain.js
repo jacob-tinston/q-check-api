@@ -43,6 +43,7 @@ const probeDomain = async (domain) => {
         issuer: cert.issuer,
         signatureAlgorithm: getSignatureAlgorithm(pem),
         signatureHashAlgorithm: getSignatureHashAlgorithm(pem),
+        publicKeyLength: cert.bits,
       });
 
       cert = cert.issuerCertificate && cert.issuerCertificate !== cert
