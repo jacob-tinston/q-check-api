@@ -1,5 +1,5 @@
 const dns = require('dns').promises;
-const { connectTLS, findMinTLSVersion } = require('./tls');
+const { connectTLS, probeTLSVersionsAndCiphers } = require('./tls');
 const { 
   getSignatureAlgorithm, 
   getSignatureHashAlgorithm 
@@ -9,7 +9,7 @@ const probeDomain = async (domain) => {
   const result = {
     domain,
     tls: { minVersion: null, negotiatedVersion: null },
-    cipher: null,
+    ciphers: [],
     certificateChain: [],
   };
 
@@ -24,12 +24,13 @@ const probeDomain = async (domain) => {
     enableTrace: false, // Avoids noisy logs
   };
 
-  result.tls.minVersion = await findMinTLSVersion(socketParams);
+  const { minTLSVersion, ciphers } = await probeTLSVersionsAndCiphers(socketParams);
+  result.tls.minVersion = minTLSVersion;
+  result.ciphers = ciphers;
 
   const socket = await connectTLS(socketParams);
 
   result.tls.negotiatedVersion = socket.getProtocol();
-  result.cipher = socket.getCipher();
 
   const peerCert = socket.getPeerCertificate(true);
   if (peerCert) {

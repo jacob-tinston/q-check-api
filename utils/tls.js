@@ -16,7 +16,10 @@ const connectTLS = async (params) => {
   });
 }
 
-const findMinTLSVersion = async (params) => {
+const probeTLSVersionsAndCiphers = async (params) => {
+  let minTLSVersion = null;
+  let ciphers = [];
+
   for (const version of TLS_VERSIONS) {
     try {
       const socket = await connectTLS({
@@ -25,15 +28,18 @@ const findMinTLSVersion = async (params) => {
         maxVersion: version,
       });
 
+      if (!minTLSVersion) minTLSVersion = version;
+      ciphers.push(socket.getCipher());
+
       socket.destroy();
-      return version;
     } catch (err) {
       console.warn(`TLS version ${version} not supported for ${params.servername}`);
     }
   }
+  return { minTLSVersion, ciphers };
 }
 
 module.exports = {
   connectTLS,
-  findMinTLSVersion,
+  probeTLSVersionsAndCiphers,
 };
