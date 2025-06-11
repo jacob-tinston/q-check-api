@@ -1,9 +1,6 @@
 // CREDIT: https://blog.jverkamp.com/2025/05/29/parsing-pem-certificates-asn.1-in-javascript/
 const crypto = require('crypto');
 
-// https://www.cs.auckland.ac.nz/~pgut001/dumpasn1.cfg
-let KNOWN_OID_VALUES = {};
-
 // TODO: Takes a while, consider caching
 async function fetchOidValues() {
   let fetchedOidValues = {};
@@ -40,7 +37,7 @@ async function fetchOidValues() {
     console.error("Failed to fetch OID values:", err);
   }
 
-  KNOWN_OID_VALUES = fetchedOidValues;
+  return fetchedOidValues;
 }
 
 function parsePEM(pem) {
@@ -113,19 +110,19 @@ function decodeOID(bytes) {
   return values.join(" ");
 }
 
-function findSignatureAlgorithm(node) {
+function findSignatureAlgorithm(node, knownOIDValues) {
   // The signature algorithm is typically inside a SEQUENCE (tag 0x10)
   if ((node.tag & 0x1f) === 0x10 && node.children.length >= 1) { // SEQUENCE
     for (const child of node.children) {
       if ((child.tag & 0x1f) === 0x06) { // OBJECT IDENTIFIER (OID)
         const oid = decodeOID(child.value);
-        return KNOWN_OID_VALUES[oid] || oid;
+        return knownOIDValues[oid] || oid;
       }
     }
   }
 
   for (const child of node.children) {
-    const result = findSignatureAlgorithm(child);
+    const result = findSignatureAlgorithm(child, knownOIDValues);
     if (result) return result;
   }
 
@@ -138,13 +135,12 @@ function getPEMCertificate(rawCert) {
   return parsePEM(pem);
 }
 
-async function getSignatureAlgorithm(rawCert) {
+function getSignatureAlgorithm(rawCert, knownOIDValues) {
   const der = getPEMCertificate(rawCert);
   if (!der) return null;
   
-  await fetchOidValues();
   const root = readASN1(der);
-  return findSignatureAlgorithm(root);
+  return findSignatureAlgorithm(root, knownOIDValues);
 }
 
 function getSignatureHashAlgorithm(algorithmName) {
@@ -163,7 +159,8 @@ function getSignatureHashAlgorithm(algorithmName) {
   }
 }
 
-module.exports = { 
+module.exports = {
+  fetchOidValues,
   getSignatureAlgorithm, 
   getSignatureHashAlgorithm
 };

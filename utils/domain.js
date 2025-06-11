@@ -1,6 +1,7 @@
 const dns = require('dns').promises;
 const { connectTLS, probeTLSVersionsAndCiphers } = require('./tls');
 const { 
+  fetchOidValues,
   getSignatureAlgorithm, 
   getSignatureHashAlgorithm 
 } = require('./certificates');
@@ -32,11 +33,13 @@ const probeDomain = async (domain) => {
 
   result.tls.negotiatedVersion = socket.getProtocol();
 
+  const knownOIDValues = await fetchOidValues();
+
   const peerCert = socket.getPeerCertificate(true);
   if (peerCert) {
     let cert = peerCert;
     while (cert) {
-      const signatureAlgorithm = await getSignatureAlgorithm(cert.raw);
+      const signatureAlgorithm = getSignatureAlgorithm(cert.raw, knownOIDValues);
       const signatureHashAlgorithm = getSignatureHashAlgorithm(signatureAlgorithm);
 
       result.certificateChain.push({
