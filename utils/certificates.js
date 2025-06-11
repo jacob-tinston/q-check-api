@@ -2,30 +2,46 @@
 const crypto = require('crypto');
 
 // https://www.cs.auckland.ac.nz/~pgut001/dumpasn1.cfg
-const KNOWN_OID_VALUES = {
-  "1 2 840 10045 2 1": "ecPublicKey",
-  "1 2 840 10045 3 1 7": "c2tnb191v3",
-  "1 2 840 113549 1 1 1": "rsaEncryption",
-  "1 2 840 113549 1 1 11": "sha256WithRSAEncryption",
-  "1 2 840 113549 1 1 5": "sha1WithRSAEncryption",
-  "1 3 6 1 4 1 11129 2 4 2": "googleSignedCertificateTimestamp",
-  "1 3 6 1 5 5 7 1 1": "authorityInfoAccess",
-  "2 5 29 14": "subjectKeyIdentifier",
-  "2 5 29 15": "keyUsage",
-  "2 5 29 17": "subjectAltName",
-  "2 5 29 19": "basicConstraints",
-  "2 5 29 31": "cRLDistributionPoints",
-  "2 5 29 32": "certificatePolicies",
-  "2 5 29 35": "authorityKeyIdentifier",
-  "2 5 29 37": "extKeyUsage",
-  "2 5 4 10": "organizationName",
-  "2 5 4 11": "organizationalUnitName",
-  "2 5 4 3": "commonName",
-  "2 5 4 6": "countryName",
-  "2 5 4 7": "localityName",
-  "2 5 4 8": "stateOrProvinceName",
-  "1 2 840 10045 4 3 2": "ecdsaWithSHA256",
-};
+let KNOWN_OID_VALUES = {};
+
+// TODO: Takes a while, consider caching
+async function fetchOidValues() {
+  let fetchedOidValues = {};
+
+  try {
+    const response = await fetch('https://www.cs.auckland.ac.nz/~pgut001/dumpasn1.cfg');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.text();
+    const oidMap = {};
+    const sections = data.split('\n\n');
+    
+    for (const section of sections) {
+      const lines = section.split('\n');
+      let oid, description;
+      
+      for (const line of lines) {
+        if (line.startsWith('OID = ')) {
+          oid = line.replace('OID = ', '').trim();
+        } else if (line.startsWith('Description = ')) {
+          description = line.replace('Description = ', '').trim();
+        }
+      }
+      
+      if (oid && description) {
+        const formattedOid = oid.includes('.') ? oid.replace(/\./g, ' ') : oid;
+        oidMap[formattedOid] = description;
+      }
+    }
+
+    fetchedOidValues = oidMap;
+  } catch (err) {
+    console.error("Failed to fetch OID values:", err);
+  }
+
+  KNOWN_OID_VALUES = fetchedOidValues;
+}
 
 function parsePEM(pem) {
   const pemRegex = /-----BEGIN CERTIFICATE-----([\s\S]+?)-----END CERTIFICATE-----/;
@@ -116,7 +132,22 @@ function findSignatureAlgorithm(node) {
   return null;
 }
 
-function extractHashFromAlgorithm(algorithmName) {
+function getPEMCertificate(rawCert) {
+  const x509 = new crypto.X509Certificate(rawCert);
+  const pem = x509.toString();
+  return parsePEM(pem);
+}
+
+async function getSignatureAlgorithm(rawCert) {
+  const der = getPEMCertificate(rawCert);
+  if (!der) return null;
+  
+  await fetchOidValues();
+  const root = readASN1(der);
+  return findSignatureAlgorithm(root);
+}
+
+function getSignatureHashAlgorithm(algorithmName) {
   if (!algorithmName) return null;
 
   const hashPattern = /(?:sha|SHA)(\d+)/i.exec(algorithmName);
@@ -132,26 +163,7 @@ function extractHashFromAlgorithm(algorithmName) {
   }
 }
 
-function getPEMCertificate(rawCert) {
-  const x509 = new crypto.X509Certificate(rawCert);
-  const pem = x509.toString();
-  return parsePEM(pem);
-}
-
-function getSignatureAlgorithm(der) {
-  if (!der) return null;
-  
-  const root = readASN1(der);
-  return findSignatureAlgorithm(root);
-}
-
-function getSignatureHashAlgorithm(pem) {
-  const algorithmName = getSignatureAlgorithm(pem);
-  return extractHashFromAlgorithm(algorithmName);
-}
-
 module.exports = { 
-  getPEMCertificate, 
   getSignatureAlgorithm, 
   getSignatureHashAlgorithm
 };

@@ -1,7 +1,6 @@
 const dns = require('dns').promises;
 const { connectTLS, findMinTLSVersion } = require('./tls');
 const { 
-  getPEMCertificate,
   getSignatureAlgorithm, 
   getSignatureHashAlgorithm 
 } = require('./certificates');
@@ -36,13 +35,14 @@ const probeDomain = async (domain) => {
   if (peerCert) {
     let cert = peerCert;
     while (cert) {
-      const pem = getPEMCertificate(cert.raw);
+      const signatureAlgorithm = await getSignatureAlgorithm(cert.raw);
+      const signatureHashAlgorithm = getSignatureHashAlgorithm(signatureAlgorithm);
 
       result.certificateChain.push({
         subject: cert.subject,
         issuer: cert.issuer,
-        signatureAlgorithm: getSignatureAlgorithm(pem),
-        signatureHashAlgorithm: getSignatureHashAlgorithm(pem),
+        signatureAlgorithm: signatureAlgorithm,
+        signatureHashAlgorithm: signatureHashAlgorithm,
         publicKeyLength: cert.bits,
       });
 
