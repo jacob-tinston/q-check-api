@@ -1,7 +1,10 @@
 const tls = require('tls');
 
-// const TLS_VERSIONS = ['TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3']; // node:tls doesn't support < TLSv1.2
-const TLS_VERSIONS = ['TLSv1.2', 'TLSv1.3'];
+// Note: node:tls doesn't support < TLSv1.2
+const TLS_VERSIONS = {
+  TLS1_2: 'TLSv1.2',
+  TLS1_3: 'TLSv1.3'
+};
 
 const connectTLS = async (params) => {
   return new Promise((resolve, reject) => {
@@ -20,7 +23,7 @@ const probeTLSVersionsAndCiphers = async (params) => {
   let minTLSVersion = null;
   let ciphers = [];
 
-  for (const version of TLS_VERSIONS) {
+  for (const version of Object.values(TLS_VERSIONS)) {
     try {
       const socket = await connectTLS({
         ...params,
@@ -40,6 +43,7 @@ const probeTLSVersionsAndCiphers = async (params) => {
 }
 
 module.exports = {
+  TLS_VERSIONS,
   connectTLS,
   probeTLSVersionsAndCiphers,
 };

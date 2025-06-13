@@ -20,11 +20,11 @@ router.get('/scan', async (req, res, next) => {
   
     return res.status(200).json({ 
       success: true, 
+      score: scoreData,
       probe: {
         domain,
         data: probeData
-      },
-      score: scoreData
+      }
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err });
