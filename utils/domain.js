@@ -1,3 +1,4 @@
+const validator = require('validator');
 const dns = require('dns').promises;
 const { connectTLS, probeTLSVersionsAndCiphers } = require('./tls');
 const { 
@@ -6,9 +7,20 @@ const {
   getSignatureHashAlgorithm 
 } = require('./certificates');
 
+const validateDomain = (domain) => {
+  const formattedDomain = domain.trim().toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/\/.*$/, '');
+  
+  if (!validator.isFQDN(formattedDomain)) {
+    return null;
+  }
+
+  return formattedDomain;
+}
+
 const probeDomain = async (domain) => {
   const result = {
-    domain,
     tls: { minVersion: null, negotiatedVersion: null },
     ciphers: [],
     certificateChain: [],
@@ -60,4 +72,4 @@ const probeDomain = async (domain) => {
   return result;
 }
 
-module.exports = { probeDomain };
+module.exports = { validateDomain, probeDomain };
